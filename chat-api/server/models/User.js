@@ -49,6 +49,15 @@ userSchema.statics.getUserById = async function (id) {
     throw error;
   }
 };
+userSchema.statics.getUserByIds = async function (ids) {
+  try {
+    // $in selects first document that matches any value in the array given
+    const users = await this.find({ _id: { $in: ids } });
+    return users;
+  } catch (error) {
+    throw error;
+  }
+};
 userSchema.statics.getUsers = async function () {
   try {
     const users = await this.find();
@@ -61,15 +70,6 @@ userSchema.statics.deleteByUserById = async function (id) {
   try {
     const result = await this.remove({ _id: id });
     return result;
-  } catch (error) {
-    throw error;
-  }
-};
-userSchema.statics.getUserByIds = async function (ids) {
-  try {
-    // $in selects first document that matches any value in the array given
-    const users = await this.find({ _id: { $id: ids } });
-    return users;
   } catch (error) {
     throw error;
   }

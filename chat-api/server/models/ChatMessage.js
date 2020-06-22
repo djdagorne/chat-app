@@ -45,6 +45,7 @@ chatMessageSchema.statics.createPostInChatRoom = async function (
   message,
   postedByUser
 ) {
+  // todo so aggregate is coming back empty 100% of the time.
   try {
     const post = await this.create({
       chatRoomId,
@@ -67,7 +68,8 @@ chatMessageSchema.statics.createPostInChatRoom = async function (
         },
       },
       { $unwind: "$postedByUser" },
-      //do another join on a table called chatrooms and get the chatroom whose _id === chatRoomId
+      // do another join on a table called chatrooms and get the chatroom whose _id === chatRoomId
+      // TODO trouble here1!!
       {
         $lookup: {
           from: "chatrooms",
@@ -76,37 +78,91 @@ chatMessageSchema.statics.createPostInChatRoom = async function (
           as: "chatRoomInfo",
         },
       },
-      { $unwind: "$chatRoomInfo" },
-      { $unwind: "$chatRoomInfo.userIds" },
-      //join on table users and get user whose _id === userIds
-      {
-        $lookup: {
-          from: "users",
-          localField: "chatRoomInfo.userIds",
-          foreignField: "_id",
-          as: "chatRoomInfo.userProfile",
-        },
-      },
-      { $unwind: "$chatRoomInfo.userProfile" },
-      {
-        $group: {
-          _id: "$chatRoomInfo._id",
-          postId: { $last: "$_id" },
-          chatRoomId: { $last: "$chatRoomInfo._id" },
-          message: { $last: "$message" },
-          type: { $last: "$type" },
-          postedByUser: { $last: "$postedByUser" },
-          readByRecipients: { $last: "$readByRecipients" },
-          chatRoomInfo: { $addToSet: "$chatRoomInfo.userProfile" },
-          createdAt: { $last: "$createdAt" },
-          updatedAt: { $last: "$updatedAt" },
-        },
-      },
+      // { $unwind: "$chatRoomInfo" },
+      // { $unwind: "$chatRoomInfo.userIds" },
+      // //join on table users and get user whose _id === userIds
+      // {
+      //   $lookup: {
+      //     from: "users",
+      //     localField: "chatRoomInfo.userIds",
+      //     foreignField: "_id",
+      //     as: "chatRoomInfo.userProfile",
+      //   },
+      // },
+      // { $unwind: "$chatRoomInfo.userProfile" },
+      // {
+      //   $group: {
+      //     _id: "$chatRoomInfo._id",
+      //     postId: { $last: "$_id" },
+      //     chatRoomId: { $last: "$chatRoomInfo._id" },
+      //     message: { $last: "$message" },
+      //     type: { $last: "$type" },
+      //     postedByUser: { $last: "$postedByUser" },
+      //     readByRecipients: { $last: "$readByRecipients" },
+      //     chatRoomInfo: { $addToSet: "$chatRoomInfo.userProfile" },
+      //     createdAt: { $last: "$createdAt" },
+      //     updatedAt: { $last: "$updatedAt" },
+      //   },
+      // },
     ]);
     return aggregate[0];
   } catch (error) {
     throw error;
   }
 };
-
+chatMessageSchema.statics.getConversationByRoomId = async function (
+  chatRoomId,
+  options = {}
+) {
+  try {
+    return this.aggregate([
+      { $match: { chatRoomId } },
+      { $sort: { createdAt: -1 } },
+      // join to table users, get user whose id = postedByUser
+      {
+        $lookup: {
+          from: "users",
+          localField: "postedByUser",
+          foreignField: "_id",
+          as: "postedByUser",
+        },
+      },
+      { $unwind: "$postedByUser" },
+      // pagination
+      { $skip: options.page * options.limit },
+      { $limit: options.limit },
+      { $sort: { createdAt: 1 } },
+    ]);
+  } catch (error) {
+    throw error;
+  }
+};
+chatMessageSchema.statics.markMessageRead = async function (
+  chatRoomId,
+  currentUserOnlineId
+) {
+  try {
+    return this.updateMany(
+      // find all msgs in posts in the chatmsg collection
+      // where readbyuser isnt equal to currUserOnlineId
+      {
+        chatRoomId,
+        "readByRecipients.readByUser": { $ne: currentUserOnlineId },
+      },
+      // once we find the msgs where online users arent in the readByRec array
+      //we add those online users to the readByRec array
+      {
+        $addToSet: {
+          readByRecipients: { readByUserId: currentUserOnlineId },
+        },
+      },
+      // multi makes mongoose apply this to all records not just first
+      {
+        multi: true,
+      }
+    );
+  } catch (error) {
+    throw error;
+  }
+};
 export default mongoose.model("ChatMessage", chatMessageSchema);

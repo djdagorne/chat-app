@@ -6,7 +6,7 @@ export const CHAT_ROOM_TYPES = {
   CONSUMER_TO_SUPPORT: "consumer-to-support",
 };
 
-const chatRoomSchema = new moongoose.Schema(
+const chatRoomSchema = new mongoose.Schema(
   {
     _id: {
       type: String,
@@ -54,6 +54,7 @@ chatRoomSchema.statics.initiateChat = async function (
       type,
       chatInitiator,
     });
+
     return {
       isNew: true,
       message: "creating new chat room",
