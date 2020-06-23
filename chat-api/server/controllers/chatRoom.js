@@ -14,7 +14,7 @@ export default {
             type: types.array,
             options: {
               unique: true,
-              empty: false,
+              empty: true,
               stringOnly: true,
             },
           },
@@ -70,14 +70,33 @@ export default {
         messagePayload,
         currentLoggedUser
       );
-      console.log("post in controllers =", post);
       global.io.sockets.in(roomId).emit("new message", { message: post });
       return res.status(200).json({ success: true, post });
     } catch (error) {
       return res.status(500).json({ success: false, error: error });
     }
   },
-  getRecentConversation: async (req, res) => {},
+  getRecentConversation: async (req, res) => {
+    try {
+      const currentLoggedUser = req.userId;
+      const options = {
+        page: parseInt(req.query.page) || 0,
+        limit: parseInt(req.query.limit) || 10,
+      };
+      const rooms = await ChatRoomModel.getChatRoomsByUserId(currentLoggedUser);
+      const roomIds = rooms.map((room) => room._id);
+      const recentConversation = await ChatMessageModel.getRecentConversation(
+        roomIds,
+        options,
+        currentLoggedUser
+      );
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: error,
+      });
+    }
+  },
   getConversationByRoomId: async (req, res) => {
     try {
       const { roomId } = req.params;
@@ -97,7 +116,6 @@ export default {
         roomId,
         options
       );
-      console.log(conversation);
       return res.status(200).json({
         success: true,
         conversation,
